@@ -1,0 +1,24 @@
+bloodconnect/
+│
+├── admin/
+├── donor/
+├── requester/
+│
+├── config/
+│   └── database.php
+│
+├── includes/
+│
+├── assets/
+│   ├── css/
+│   ├── js/
+│   ├── images/
+│   │   └── blood-bg.jpg
+│   └── uploads/
+│
+├── index.php---
+├── login.php
+├── register.php---
+├── logout.php
+├── about.php----
+└── contact.php----
