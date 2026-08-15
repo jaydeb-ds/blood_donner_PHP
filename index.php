@@ -1418,7 +1418,7 @@ nearby donors as quickly as possible.
 <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
 
 <a
-href="request-blood.php"
+href="search.php"
 class="emergency-btn">
 
 <i class="bi bi-exclamation-triangle-fill"></i>
@@ -1482,7 +1482,7 @@ Find Donor
 Become a Donor
 </a>
 
-<a href="request-blood.php">
+<a href="search.php">
 Request Blood
 </a>
 

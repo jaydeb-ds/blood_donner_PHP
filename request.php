@@ -2,25 +2,7 @@
 
 session_start();
 
-require_once "../config/database.php";
-
-
-// =====================================================
-// CHECK LOGIN
-// =====================================================
-
-if (!isset($_SESSION["user_id"])) {
-
-    $_SESSION["redirect_after_login"] =
-        "donor/request.php?donor_id=" .
-        ($_GET["donor_id"] ?? "");
-
-    header("Location: ../login.php");
-    exit();
-}
-
-
-$requester_id = (int) $_SESSION["user_id"];
+require_once "./config/database.php";
 
 
 // =====================================================
@@ -34,85 +16,10 @@ if (
 
     header("Location: ../blood/search.php");
     exit();
-}
 
+}
 
 $donor_id = (int) $_GET["donor_id"];
-
-
-// =====================================================
-// DON'T ALLOW REQUEST TO SELF
-// =====================================================
-
-if ($donor_id === $requester_id) {
-
-    header("Location: ../blood/search.php");
-    exit();
-}
-
-
-// =====================================================
-// GET REQUESTER INFORMATION
-// =====================================================
-
-$requester_sql = "
-    SELECT
-        id,
-        full_name,
-        email,
-        phone
-
-    FROM users
-
-    WHERE id = ?
-
-    LIMIT 1
-";
-
-
-$requester_stmt =
-    mysqli_prepare(
-        $conn,
-        $requester_sql
-    );
-
-
-mysqli_stmt_bind_param(
-    $requester_stmt,
-    "i",
-    $requester_id
-);
-
-
-mysqli_stmt_execute(
-    $requester_stmt
-);
-
-
-$requester_result =
-    mysqli_stmt_get_result(
-        $requester_stmt
-    );
-
-
-if (
-    mysqli_num_rows($requester_result) !== 1
-) {
-
-    die("Requester account not found.");
-
-}
-
-
-$requester =
-    mysqli_fetch_assoc(
-        $requester_result
-    );
-
-
-mysqli_stmt_close(
-    $requester_stmt
-);
 
 
 // =====================================================
@@ -121,12 +28,10 @@ mysqli_stmt_close(
 
 $donor_sql = "
     SELECT
-
         u.id AS user_id,
-
         u.full_name,
-        u.phone,
         u.email,
+        u.phone,
         u.status,
 
         d.blood_group,
@@ -149,11 +54,10 @@ $donor_sql = "
 ";
 
 
-$donor_stmt =
-    mysqli_prepare(
-        $conn,
-        $donor_sql
-    );
+$donor_stmt = mysqli_prepare(
+    $conn,
+    $donor_sql
+);
 
 
 mysqli_stmt_bind_param(
@@ -168,34 +72,28 @@ mysqli_stmt_execute(
 );
 
 
-$donor_result =
-    mysqli_stmt_get_result(
-        $donor_stmt
-    );
+$donor_result = mysqli_stmt_get_result(
+    $donor_stmt
+);
 
 
 if (
     mysqli_num_rows($donor_result) !== 1
 ) {
 
-    mysqli_stmt_close(
-        $donor_stmt
-    );
+    mysqli_stmt_close($donor_stmt);
 
-    die("The selected donor was not found or is no longer active.");
+    die("Donor not found.");
 
 }
 
 
-$donor =
-    mysqli_fetch_assoc(
-        $donor_result
-    );
-
-
-mysqli_stmt_close(
-    $donor_stmt
+$donor = mysqli_fetch_assoc(
+    $donor_result
 );
+
+
+mysqli_stmt_close($donor_stmt);
 
 
 // =====================================================
@@ -211,87 +109,54 @@ $success = "";
 // FORM VALUES
 // =====================================================
 
-$patient_name =
-    trim(
-        $_POST["patient_name"] ?? ""
-    );
+$requester_name =
+    trim($_POST["requester_name"] ?? "");
 
+$requester_phone =
+    trim($_POST["requester_phone"] ?? "");
+
+$requester_email =
+    trim($_POST["requester_email"] ?? "");
+
+$patient_name =
+    trim($_POST["patient_name"] ?? "");
 
 $blood_group =
-    trim(
-        $_POST["blood_group"] ?? ""
-    );
-
+    trim($_POST["blood_group"] ?? "");
 
 $units_required =
-    trim(
-        $_POST["units_required"] ?? "1"
-    );
-
+    trim($_POST["units_required"] ?? "1");
 
 $hospital_name =
-    trim(
-        $_POST["hospital_name"] ?? ""
-    );
-
+    trim($_POST["hospital_name"] ?? "");
 
 $hospital_address =
-    trim(
-        $_POST["hospital_address"] ?? ""
-    );
-
+    trim($_POST["hospital_address"] ?? "");
 
 $city =
-    trim(
-        $_POST["city"] ?? ""
-    );
-
+    trim($_POST["city"] ?? "");
 
 $district =
-    trim(
-        $_POST["district"] ?? ""
-    );
-
+    trim($_POST["district"] ?? "");
 
 $state =
-    trim(
-        $_POST["state"] ?? ""
-    );
-
+    trim($_POST["state"] ?? "");
 
 $pincode =
-    trim(
-        $_POST["pincode"] ?? ""
-    );
-
-
-$contact_phone =
-    trim(
-        $_POST["contact_phone"]
-        ?? $requester["phone"]
-    );
-
+    trim($_POST["pincode"] ?? "");
 
 $urgency =
-    trim(
-        $_POST["urgency"] ?? "Normal"
-    );
-
+    trim($_POST["urgency"] ?? "Normal");
 
 $required_date =
-    trim(
-        $_POST["required_date"] ?? ""
-    );
-
+    trim($_POST["required_date"] ?? "");
 
 $additional_message =
-    trim(
-        $_POST["additional_message"] ?? ""
-    );
+    trim($_POST["additional_message"] ?? "");
 
 
 // =====================================================
-// ALLOWED VALUES
+// OPTIONS
 // =====================================================
 
 $blood_groups = [
@@ -318,7 +183,7 @@ $urgency_options = [
 
 
 // =====================================================
-// SUBMIT REQUEST
+// FORM SUBMISSION
 // =====================================================
 
 if (
@@ -327,10 +192,12 @@ if (
 
 
     // =================================================
-    // VALIDATE REQUIRED FIELDS
+    // REQUIRED FIELDS
     // =================================================
 
     if (
+        empty($requester_name) ||
+        empty($requester_phone) ||
         empty($patient_name) ||
         empty($blood_group) ||
         empty($units_required) ||
@@ -340,12 +207,46 @@ if (
         empty($district) ||
         empty($state) ||
         empty($pincode) ||
-        empty($contact_phone) ||
         empty($required_date)
     ) {
 
         $error =
             "Please fill in all required fields.";
+
+    }
+
+
+    // =================================================
+    // PHONE
+    // =================================================
+
+    elseif (
+        !preg_match(
+            "/^[0-9]{10}$/",
+            $requester_phone
+        )
+    ) {
+
+        $error =
+            "Please enter a valid 10-digit phone number.";
+
+    }
+
+
+    // =================================================
+    // EMAIL
+    // =================================================
+
+    elseif (
+        !empty($requester_email) &&
+        !filter_var(
+            $requester_email,
+            FILTER_VALIDATE_EMAIL
+        )
+    ) {
+
+        $error =
+            "Please enter a valid email address.";
 
     }
 
@@ -402,23 +303,6 @@ if (
 
 
     // =================================================
-    // PHONE
-    // =================================================
-
-    elseif (
-        !preg_match(
-            "/^[0-9]{10}$/",
-            $contact_phone
-        )
-    ) {
-
-        $error =
-            "Please enter a valid 10-digit phone number.";
-
-    }
-
-
-    // =================================================
     // URGENCY
     // =================================================
 
@@ -431,7 +315,7 @@ if (
     ) {
 
         $error =
-            "Please select a valid urgency level.";
+            "Please select a valid urgency.";
 
     }
 
@@ -449,7 +333,6 @@ if (
 
     }
 
-
     elseif (
         $required_date < date("Y-m-d")
     ) {
@@ -461,7 +344,7 @@ if (
 
 
     // =================================================
-    // CHECK DONOR BLOOD GROUP
+    // DONOR AVAILABILITY
     // =================================================
 
     elseif (
@@ -481,9 +364,7 @@ if (
     if (empty($error)) {
 
 
-        mysqli_begin_transaction(
-            $conn
-        );
+        mysqli_begin_transaction($conn);
 
 
         try {
@@ -498,73 +379,99 @@ if (
                 INSERT INTO blood_requests
                 (
                     requester_id,
+                    requester_name,
+                    requester_phone,
+                    requester_email,
+
                     patient_name,
                     blood_group,
                     units_required,
+
                     hospital_name,
                     hospital_address,
+
                     city,
                     district,
                     state,
                     pincode,
-                    contact_phone,
+
                     urgency,
                     required_date,
                     additional_message,
+
                     status
                 )
 
                 VALUES
                 (
+                    NULL,
+                    ?,
+                    ?,
+                    ?,
+
+                    ?,
+                    ?,
+                    ?,
+
+                    ?,
+                    ?,
+
                     ?,
                     ?,
                     ?,
                     ?,
+
                     ?,
                     ?,
                     ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
+
                     'Pending'
                 )
 
             ";
 
 
-            $insert_stmt =
-                mysqli_prepare(
-                    $conn,
-                    $insert_sql
-                );
+            $insert_stmt = mysqli_prepare(
+                $conn,
+                $insert_sql
+            );
 
 
             $units =
                 (int)$units_required;
 
 
-        mysqli_stmt_bind_param(
-      $insert_stmt,
-    "ississssssssss",
-    $requester_id,
-    $patient_name,
-    $blood_group,
-    $units,
-    $hospital_name,
-    $hospital_address,
-    $city,
-    $district,
-    $state,
-    $pincode,
-    $contact_phone,
-    $urgency,
-    $required_date,
-    $additional_message
-);
+            /*
+             * 16 values
+             *
+             * s = string
+             * i = integer
+             */
+
+            mysqli_stmt_bind_param(
+                $insert_stmt,
+                "sssssiissssssss",
+                $requester_name,
+                $requester_phone,
+                $requester_email,
+
+                $patient_name,
+                $blood_group,
+                $units,
+
+                $hospital_name,
+                $hospital_address,
+
+                $city,
+                $district,
+                $state,
+                $pincode,
+
+                $urgency,
+                $required_date,
+                $additional_message
+            );
+
 
             if (
                 !mysqli_stmt_execute(
@@ -573,16 +480,16 @@ if (
             ) {
 
                 throw new Exception(
-                    "Unable to create blood request."
+                    mysqli_stmt_error(
+                        $insert_stmt
+                    )
                 );
 
             }
 
 
             $request_id =
-                mysqli_insert_id(
-                    $conn
-                );
+                mysqli_insert_id($conn);
 
 
             mysqli_stmt_close(
@@ -591,7 +498,7 @@ if (
 
 
             // =========================================
-            // CONNECT REQUEST WITH DONOR
+            // LINK REQUEST TO DONOR
             // =========================================
 
             $link_sql = "
@@ -613,11 +520,10 @@ if (
             ";
 
 
-            $link_stmt =
-                mysqli_prepare(
-                    $conn,
-                    $link_sql
-                );
+            $link_stmt = mysqli_prepare(
+                $conn,
+                $link_sql
+            );
 
 
             mysqli_stmt_bind_param(
@@ -635,7 +541,9 @@ if (
             ) {
 
                 throw new Exception(
-                    "Unable to send request to donor."
+                    mysqli_stmt_error(
+                        $link_stmt
+                    )
                 );
 
             }
@@ -647,7 +555,7 @@ if (
 
 
             // =========================================
-            // NOTIFICATION TO DONOR
+            // NOTIFY DONOR
             // =========================================
 
             $notification_title =
@@ -655,12 +563,12 @@ if (
 
 
             $notification_message =
-                $requester["full_name"] .
+                $requester_name .
                 " needs " .
                 $blood_group .
                 " blood at " .
                 $hospital_name .
-                ". You have received a blood donation request.";
+                ". Please review the blood request.";
 
 
             $notification_type =
@@ -717,7 +625,9 @@ if (
             ) {
 
                 throw new Exception(
-                    "Unable to send donor notification."
+                    mysqli_stmt_error(
+                        $notification_stmt
+                    )
                 );
 
             }
@@ -732,18 +642,22 @@ if (
             // COMMIT
             // =========================================
 
-            mysqli_commit(
-                $conn
-            );
+            mysqli_commit($conn);
 
 
             $success =
-                "Your blood request has been sent to " .
+                "Your blood request has been sent successfully to " .
                 $donor["full_name"] .
-                " successfully.";
+                ".";
 
 
             // Clear form
+
+            $requester_name = "";
+
+            $requester_phone = "";
+
+            $requester_email = "";
 
             $patient_name = "";
 
@@ -763,9 +677,6 @@ if (
 
             $pincode = "";
 
-            $contact_phone =
-                $requester["phone"];
-
             $urgency = "Normal";
 
             $required_date = "";
@@ -774,18 +685,16 @@ if (
 
 
         }
-
         catch (
             Exception $e
         ) {
 
 
-            mysqli_rollback(
-                $conn
-            );
+            mysqli_rollback($conn);
 
 
             $error =
+                "Unable to create request: " .
                 $e->getMessage();
 
         }
@@ -809,7 +718,7 @@ name="viewport"
 content="width=device-width, initial-scale=1.0">
 
 <title>
-Request Blood From Donor | BloodConnect
+Request Blood | BloodConnect
 </title>
 
 
@@ -841,7 +750,7 @@ body {
 
     font-family: 'Inter', sans-serif;
 
-    background: #f8f9fb;
+    background: #f7f8fa;
 
     color: #1f2937;
 
@@ -861,9 +770,7 @@ body {
 }
 
 
-/* =====================================================
-NAVBAR
-===================================================== */
+/* NAVBAR */
 
 .navbar {
 
@@ -876,7 +783,7 @@ NAVBAR
 }
 
 
-.navbar-brand {
+.logo {
 
     display: flex;
 
@@ -884,9 +791,9 @@ NAVBAR
 
     gap: 10px;
 
-    color: #111827;
-
     text-decoration: none;
+
+    color: #111827;
 
     font-size: 21px;
 
@@ -901,11 +808,11 @@ NAVBAR
 
     height: 40px;
 
-    border-radius: 12px;
-
     background: var(--primary);
 
     color: white;
+
+    border-radius: 12px;
 
     display: flex;
 
@@ -920,11 +827,9 @@ NAVBAR
 
     color: #4b5563;
 
-    font-size: 13px;
+    font-size: 12px;
 
     font-weight: 600;
-
-    margin-left: 15px;
 
 }
 
@@ -936,61 +841,41 @@ NAVBAR
 }
 
 
-/* =====================================================
-PAGE
-===================================================== */
+/* PAGE */
 
-.page-wrapper {
+.page {
 
     max-width: 1000px;
 
-    margin: 40px auto;
+    margin: 45px auto;
 
     padding: 0 20px;
 
 }
 
 
-/* =====================================================
-SELECTED DONOR
-===================================================== */
+/* HEADER */
 
-.selected-donor {
+.header {
 
-    background: white;
+    text-align: center;
 
-    border: 1px solid #eee;
-
-    border-radius: 18px;
-
-    padding: 20px;
-
-    margin-bottom: 20px;
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 15px;
-
-    box-shadow:
-        0 8px 25px
-        rgba(0,0,0,0.04);
+    margin-bottom: 25px;
 
 }
 
 
-.donor-avatar {
+.header-icon {
 
-    width: 58px;
+    width: 65px;
 
-    height: 58px;
-
-    border-radius: 16px;
+    height: 65px;
 
     background: var(--light-red);
 
     color: var(--primary);
+
+    border-radius: 18px;
 
     display: flex;
 
@@ -998,29 +883,95 @@ SELECTED DONOR
 
     justify-content: center;
 
-    font-size: 21px;
+    font-size: 28px;
 
-    font-weight: 800;
-
-    flex-shrink: 0;
+    margin: auto auto 15px;
 
 }
 
 
-.donor-details {
+.header h1 {
+
+    font-size: 30px;
+
+    font-weight: 800;
+
+    margin-bottom: 7px;
+
+}
+
+
+.header p {
+
+    color: var(--gray);
+
+    font-size: 13px;
+
+}
+
+
+/* DONOR CARD */
+
+.donor-card {
+
+    background: white;
+
+    border: 1px solid #eee;
+
+    border-radius: 17px;
+
+    padding: 18px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 15px;
+
+    margin-bottom: 20px;
+
+}
+
+
+.donor-avatar {
+
+    width: 55px;
+
+    height: 55px;
+
+    background: var(--light-red);
+
+    color: var(--primary);
+
+    border-radius: 15px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    font-size: 20px;
+
+    font-weight: 800;
+
+}
+
+
+.donor-info {
 
     flex: 1;
 
 }
 
 
-.donor-details h4 {
+.donor-info h4 {
 
-    font-size: 17px;
+    font-size: 16px;
 
     font-weight: 800;
 
-    margin: 0 0 5px;
+    margin: 0 0 4px;
 
 }
 
@@ -1040,7 +991,7 @@ SELECTED DONOR
 
     color: var(--primary);
 
-    padding: 9px 14px;
+    padding: 10px 14px;
 
     border-radius: 10px;
 
@@ -1051,81 +1002,7 @@ SELECTED DONOR
 }
 
 
-/* =====================================================
-HEADER
-===================================================== */
-
-.page-header {
-
-    text-align: center;
-
-    margin-bottom: 25px;
-
-}
-
-
-.page-header h1 {
-
-    font-size: 30px;
-
-    font-weight: 800;
-
-    margin-bottom: 7px;
-
-}
-
-
-.page-header p {
-
-    color: var(--gray);
-
-    font-size: 13px;
-
-}
-
-
-/* =====================================================
-ALERT
-===================================================== */
-
-.alert-custom {
-
-    padding: 14px 16px;
-
-    border-radius: 11px;
-
-    font-size: 12px;
-
-    margin-bottom: 20px;
-
-}
-
-
-.success-alert {
-
-    background: #ecfdf5;
-
-    color: #047857;
-
-    border: 1px solid #a7f3d0;
-
-}
-
-
-.error-alert {
-
-    background: #fff1f2;
-
-    color: #be123c;
-
-    border: 1px solid #fecdd3;
-
-}
-
-
-/* =====================================================
-FORM CARD
-===================================================== */
+/* FORM CARD */
 
 .form-card {
 
@@ -1139,7 +1016,7 @@ FORM CARD
 
     box-shadow:
         0 10px 35px
-        rgba(0,0,0,0.05);
+        rgba(0,0,0,.05);
 
 }
 
@@ -1161,14 +1038,14 @@ FORM CARD
 
     border-bottom: 1px solid #eee;
 
-    padding-bottom: 14px;
+    padding-bottom: 13px;
 
     margin-bottom: 20px;
 
 }
 
 
-.section-number {
+.number {
 
     width: 30px;
 
@@ -1206,13 +1083,9 @@ FORM CARD
 
 .section-title small {
 
-    display: block;
-
     color: var(--gray);
 
     font-size: 10px;
-
-    margin-top: 2px;
 
 }
 
@@ -1261,7 +1134,7 @@ FORM CARD
 }
 
 
-textarea.form-control {
+textarea {
 
     min-height: 110px;
 
@@ -1270,9 +1143,7 @@ textarea.form-control {
 }
 
 
-/* =====================================================
-URGENCY
-===================================================== */
+/* URGENCY */
 
 .urgency {
 
@@ -1294,11 +1165,11 @@ URGENCY
 
     display: block;
 
-    padding: 14px;
-
     border: 1px solid #e5e7eb;
 
     border-radius: 11px;
+
+    padding: 14px;
 
     cursor: pointer;
 
@@ -1327,62 +1198,72 @@ URGENCY
 
 .urgency input:checked + label {
 
-    border-color: var(--primary);
-
     background: var(--light-red);
+
+    border-color: var(--primary);
 
 }
 
 
-.normal strong {
+/* ALERT */
+
+.alert-box {
+
+    padding: 14px 16px;
+
+    border-radius: 11px;
+
+    margin-bottom: 20px;
+
+    font-size: 12px;
+
+}
+
+
+.success {
+
+    background: #ecfdf5;
+
+    border: 1px solid #a7f3d0;
 
     color: #047857;
 
 }
 
 
-.urgent strong {
+.error {
 
-    color: #c2410c;
+    background: #fff1f2;
 
-}
+    border: 1px solid #fecdd3;
 
-
-.emergency strong {
-
-    color: #b91c1c;
+    color: #be123c;
 
 }
 
 
-/* =====================================================
-INFO
-===================================================== */
+/* INFO */
 
-.info-box {
+.info {
 
     background: #eff6ff;
 
-    color: #1e40af;
-
     border: 1px solid #bfdbfe;
+
+    color: #1e40af;
 
     border-radius: 11px;
 
-    padding: 13px 15px;
+    padding: 14px;
 
     font-size: 11px;
 
     line-height: 1.7;
 
-    margin-top: 20px;
-
 }
 
 
-/* =====================================================
-BUTTONS
-===================================================== */
+/* BUTTONS */
 
 .actions {
 
@@ -1394,24 +1275,24 @@ BUTTONS
 
     border-top: 1px solid #eee;
 
-    padding-top: 25px;
-
     margin-top: 25px;
+
+    padding-top: 25px;
 
 }
 
 
 .back-btn {
 
+    padding: 11px 18px;
+
+    border-radius: 9px;
+
     background: #f3f4f6;
 
     color: #374151;
 
     text-decoration: none;
-
-    padding: 11px 18px;
-
-    border-radius: 9px;
 
     font-size: 12px;
 
@@ -1424,13 +1305,13 @@ BUTTONS
 
     border: none;
 
-    background: var(--primary);
-
-    color: white;
-
     padding: 11px 22px;
 
     border-radius: 9px;
+
+    background: var(--primary);
+
+    color: white;
 
     font-size: 12px;
 
@@ -1446,18 +1327,39 @@ BUTTONS
 }
 
 
-/* =====================================================
-RESPONSIVE
-===================================================== */
+/* FOOTER */
 
-@media(max-width: 576px) {
+footer {
 
-    .page-wrapper {
+    background: #111827;
+
+    color: #9ca3af;
+
+    text-align: center;
+
+    padding: 25px;
+
+    margin-top: 50px;
+
+    font-size: 10px;
+
+}
+
+
+footer strong {
+
+    color: white;
+
+}
+
+
+@media(max-width:600px) {
+
+    .page {
 
         margin-top: 25px;
 
     }
-
 
     .form-card {
 
@@ -1465,27 +1367,17 @@ RESPONSIVE
 
     }
 
-
-    .selected-donor {
+    .donor-card {
 
         align-items: flex-start;
 
     }
-
-
-    .blood-badge {
-
-        margin-left: auto;
-
-    }
-
 
     .actions {
 
         flex-direction: column;
 
     }
-
 
     .back-btn,
     .submit-btn {
@@ -1516,16 +1408,14 @@ NAVBAR
 
 
 <a
-href="../index.php"
-class="navbar-brand">
-
+href="index.php"
+class="logo">
 
 <div class="logo-icon">
 
 <i class="bi bi-heart-pulse-fill"></i>
 
 </div>
-
 
 BloodConnect
 
@@ -1536,7 +1426,7 @@ BloodConnect
 
 <a
 href="../blood/search.php"
-class="nav-link d-inline-block">
+class="nav-link me-3">
 
 <i class="bi bi-search"></i>
 
@@ -1546,10 +1436,10 @@ Find Donors
 
 
 <a
-href="../donor/dashboard.php"
-class="nav-link d-inline-block">
+href="login.php"
+class="nav-link">
 
-Dashboard
+Login
 
 </a>
 
@@ -1566,14 +1456,45 @@ Dashboard
 PAGE
 ===================================================== -->
 
-<div class="page-wrapper">
+<div class="page">
+
+
+<!-- HEADER -->
+
+<div class="header">
+
+
+<div class="header-icon">
+
+<i class="bi bi-droplet-fill"></i>
+
+</div>
+
+
+<h1>
+
+Request Blood
+
+</h1>
+
+
+<p>
+
+Send a blood request directly to the
+selected donor.
+
+</p>
+
+
+</div>
+
 
 
 <!-- =====================================================
 SELECTED DONOR
 ===================================================== -->
 
-<div class="selected-donor">
+<div class="donor-card">
 
 
 <div class="donor-avatar">
@@ -1595,12 +1516,11 @@ echo htmlspecialchars(
 </div>
 
 
-<div class="donor-details">
+<div class="donor-info">
 
 
 <h4>
 
-Request Blood From
 <?php
 
 echo htmlspecialchars(
@@ -1622,34 +1542,16 @@ echo htmlspecialchars(
     $donor["city"]
 );
 
-?>
+?>,
 
-
-<?php if (
-    !empty(
-        $donor["district"]
-    )
-): ?>
-
-,
 <?php
 
 echo htmlspecialchars(
     $donor["district"]
 );
 
-?>
+?>,
 
-<?php endif; ?>
-
-
-<?php if (
-    !empty(
-        $donor["state"]
-    )
-): ?>
-
-,
 <?php
 
 echo htmlspecialchars(
@@ -1658,18 +1560,18 @@ echo htmlspecialchars(
 
 ?>
 
-<?php endif; ?>
-
 
 <br>
 
-<i class="bi bi-circle-fill"
+<span
 style="
-font-size:6px;
 color:#059669;
-"></i>
+font-weight:700;
+">
 
-Available Donor
+● Available to Donate
+
+</span>
 
 </div>
 
@@ -1680,8 +1582,6 @@ Available Donor
 <div class="blood-badge">
 
 <i class="bi bi-droplet-fill"></i>
-
-&nbsp;
 
 <?php
 
@@ -1698,44 +1598,13 @@ echo htmlspecialchars(
 
 
 
-<!-- =====================================================
-HEADER
-===================================================== -->
-
-<div class="page-header">
-
-
-<h1>
-
-Create Blood Request
-
-</h1>
-
-
-<p>
-
-Your request will be sent directly to
-the selected donor.
-
-</p>
-
-
-</div>
-
-
-
-<!-- =====================================================
-ALERTS
-===================================================== -->
+<!-- ALERTS -->
 
 <?php if (
     !empty($success)
 ): ?>
 
-<div class="
-alert-custom
-success-alert">
-
+<div class="alert-box success">
 
 <i class="bi bi-check-circle-fill"></i>
 
@@ -1750,24 +1619,7 @@ echo htmlspecialchars(
 ?>
 
 
-<div class="mt-2">
-
-
-<a
-href="../donor/notifications.php"
-style="
-color:#047857;
-font-weight:700;
-text-decoration:none;
-font-size:11px;
-">
-
-View Notifications
-
-</a>
-
-
-&nbsp; | &nbsp;
+<br><br>
 
 
 <a
@@ -1776,31 +1628,22 @@ style="
 color:#047857;
 font-weight:700;
 text-decoration:none;
-font-size:11px;
 ">
 
 Find Another Donor
 
 </a>
 
-
-</div>
-
-
 </div>
 
 <?php endif; ?>
-
 
 
 <?php if (
     !empty($error)
 ): ?>
 
-<div class="
-alert-custom
-error-alert">
-
+<div class="alert-box error">
 
 <i class="bi bi-exclamation-circle-fill"></i>
 
@@ -1813,7 +1656,6 @@ echo htmlspecialchars(
 );
 
 ?>
-
 
 </div>
 
@@ -1836,7 +1678,7 @@ echo $donor_id;
 
 
 <!-- =================================================
-PATIENT INFORMATION
+SECTION 1
 ================================================= -->
 
 <div class="section">
@@ -1845,9 +1687,133 @@ PATIENT INFORMATION
 <div class="section-title">
 
 
-<div class="section-number">
+<div class="number">
 
 1
+
+</div>
+
+
+<div>
+
+<h4>
+Your Contact Information
+</h4>
+
+<small>
+Login is not required.
+</small>
+
+</div>
+
+
+</div>
+
+
+<div class="row g-3">
+
+
+<div class="col-md-4">
+
+<label class="form-label">
+
+Your Name
+
+<span class="required">*</span>
+
+</label>
+
+
+<input
+type="text"
+name="requester_name"
+class="form-control"
+placeholder="Your full name"
+value="<?php
+
+echo htmlspecialchars(
+    $requester_name
+);
+
+?>"
+required>
+
+</div>
+
+
+<div class="col-md-4">
+
+<label class="form-label">
+
+Phone Number
+
+<span class="required">*</span>
+
+</label>
+
+
+<input
+type="tel"
+name="requester_phone"
+class="form-control"
+placeholder="10-digit mobile number"
+maxlength="10"
+value="<?php
+
+echo htmlspecialchars(
+    $requester_phone
+);
+
+?>"
+required>
+
+</div>
+
+
+<div class="col-md-4">
+
+<label class="form-label">
+
+Email
+
+</label>
+
+
+<input
+type="email"
+name="requester_email"
+class="form-control"
+placeholder="Optional email"
+value="<?php
+
+echo htmlspecialchars(
+    $requester_email
+);
+
+?>">
+
+</div>
+
+
+</div>
+
+</div>
+
+
+
+<!-- =================================================
+SECTION 2
+================================================= -->
+
+<div class="section">
+
+
+<div class="section-title">
+
+
+<div class="number">
+
+2
 
 </div>
 
@@ -1859,7 +1825,7 @@ Patient Information
 </h4>
 
 <small>
-Details about the person who needs blood.
+Details of the person who needs blood.
 </small>
 
 </div>
@@ -1873,10 +1839,10 @@ Details about the person who needs blood.
 
 <div class="col-md-8">
 
-
 <label class="form-label">
 
 Patient Name
+
 <span class="required">*</span>
 
 </label>
@@ -1886,7 +1852,7 @@ Patient Name
 type="text"
 name="patient_name"
 class="form-control"
-placeholder="Enter patient's full name"
+placeholder="Patient full name"
 value="<?php
 
 echo htmlspecialchars(
@@ -1896,16 +1862,15 @@ echo htmlspecialchars(
 ?>"
 required>
 
-
 </div>
 
 
 <div class="col-md-4">
 
-
 <label class="form-label">
 
 Blood Group
+
 <span class="required">*</span>
 
 </label>
@@ -1928,7 +1893,6 @@ Select Blood Group
     $blood_groups as $group
 ): ?>
 
-
 <option
 value="<?php
 echo htmlspecialchars($group);
@@ -1944,30 +1908,26 @@ echo $blood_group === $group
 
 <?php
 
-echo htmlspecialchars(
-    $group
-);
+echo htmlspecialchars($group);
 
 ?>
 
 </option>
-
 
 <?php endforeach; ?>
 
 
 </select>
 
-
 </div>
 
 
 <div class="col-md-4">
 
-
 <label class="form-label">
 
 Units Required
+
 <span class="required">*</span>
 
 </label>
@@ -1988,7 +1948,6 @@ echo htmlspecialchars(
 ?>"
 required>
 
-
 </div>
 
 
@@ -1999,7 +1958,7 @@ required>
 
 
 <!-- =================================================
-HOSPITAL
+SECTION 3
 ================================================= -->
 
 <div class="section">
@@ -2008,9 +1967,9 @@ HOSPITAL
 <div class="section-title">
 
 
-<div class="section-number">
+<div class="number">
 
-2
+3
 
 </div>
 
@@ -2022,7 +1981,7 @@ Hospital Information
 </h4>
 
 <small>
-Location where blood is required.
+Where is the blood required?
 </small>
 
 </div>
@@ -2036,10 +1995,10 @@ Location where blood is required.
 
 <div class="col-md-6">
 
-
 <label class="form-label">
 
 Hospital Name
+
 <span class="required">*</span>
 
 </label>
@@ -2059,16 +2018,15 @@ echo htmlspecialchars(
 ?>"
 required>
 
-
 </div>
 
 
 <div class="col-md-6">
 
-
 <label class="form-label">
 
 Hospital Address
+
 <span class="required">*</span>
 
 </label>
@@ -2078,7 +2036,7 @@ Hospital Address
 type="text"
 name="hospital_address"
 class="form-control"
-placeholder="Complete hospital address"
+placeholder="Hospital address"
 value="<?php
 
 echo htmlspecialchars(
@@ -2088,16 +2046,15 @@ echo htmlspecialchars(
 ?>"
 required>
 
-
 </div>
 
 
 <div class="col-md-4">
 
-
 <label class="form-label">
 
 City
+
 <span class="required">*</span>
 
 </label>
@@ -2117,16 +2074,15 @@ echo htmlspecialchars(
 ?>"
 required>
 
-
 </div>
 
 
 <div class="col-md-4">
 
-
 <label class="form-label">
 
 District
+
 <span class="required">*</span>
 
 </label>
@@ -2146,16 +2102,15 @@ echo htmlspecialchars(
 ?>"
 required>
 
-
 </div>
 
 
 <div class="col-md-4">
 
-
 <label class="form-label">
 
 State
+
 <span class="required">*</span>
 
 </label>
@@ -2175,16 +2130,15 @@ echo htmlspecialchars(
 ?>"
 required>
 
-
 </div>
 
 
 <div class="col-md-4">
 
-
 <label class="form-label">
 
 Pincode
+
 <span class="required">*</span>
 
 </label>
@@ -2205,7 +2159,6 @@ echo htmlspecialchars(
 ?>"
 required>
 
-
 </div>
 
 
@@ -2216,7 +2169,7 @@ required>
 
 
 <!-- =================================================
-CONTACT
+SECTION 4
 ================================================= -->
 
 <div class="section">
@@ -2225,105 +2178,7 @@ CONTACT
 <div class="section-title">
 
 
-<div class="section-number">
-
-3
-
-</div>
-
-
-<div>
-
-<h4>
-Contact Information
-</h4>
-
-<small>
-Contact details for the donor.
-</small>
-
-</div>
-
-
-</div>
-
-
-<div class="row g-3">
-
-
-<div class="col-md-6">
-
-
-<label class="form-label">
-
-Contact Phone
-<span class="required">*</span>
-
-</label>
-
-
-<input
-type="tel"
-name="contact_phone"
-class="form-control"
-maxlength="10"
-placeholder="10-digit mobile number"
-value="<?php
-
-echo htmlspecialchars(
-    $contact_phone
-);
-
-?>"
-required>
-
-
-</div>
-
-
-<div class="col-md-6">
-
-
-<label class="form-label">
-
-Requester
-
-</label>
-
-
-<input
-type="text"
-class="form-control"
-value="<?php
-
-echo htmlspecialchars(
-    $requester["full_name"]
-);
-
-?>"
-readonly>
-
-
-</div>
-
-
-</div>
-
-</div>
-
-
-
-<!-- =================================================
-URGENCY
-================================================= -->
-
-<div class="section">
-
-
-<div class="section-title">
-
-
-<div class="section-number">
+<div class="number">
 
 4
 
@@ -2337,7 +2192,7 @@ Urgency
 </h4>
 
 <small>
-Tell the donor how quickly blood is needed.
+How urgently is the blood needed?
 </small>
 
 </div>
@@ -2365,13 +2220,9 @@ echo $urgency === "Normal"
 
 ?>>
 
+<label for="normal">
 
-<label
-for="normal"
-class="normal">
-
-
-<strong>
+<strong style="color:#047857;">
 
 <i class="bi bi-check-circle"></i>
 
@@ -2379,16 +2230,13 @@ Normal
 
 </strong>
 
-
 <small>
 
-Blood is needed as planned.
+Blood needed as planned.
 
 </small>
 
-
 </label>
-
 
 </div>
 
@@ -2409,13 +2257,9 @@ echo $urgency === "Urgent"
 
 ?>>
 
+<label for="urgent">
 
-<label
-for="urgent"
-class="urgent">
-
-
-<strong>
+<strong style="color:#c2410c;">
 
 <i class="bi bi-exclamation-circle"></i>
 
@@ -2423,16 +2267,13 @@ Urgent
 
 </strong>
 
-
 <small>
 
-Blood is needed soon.
+Blood needed soon.
 
 </small>
 
-
 </label>
-
 
 </div>
 
@@ -2453,13 +2294,9 @@ echo $urgency === "Emergency"
 
 ?>>
 
+<label for="emergency">
 
-<label
-for="emergency"
-class="emergency">
-
-
-<strong>
+<strong style="color:#b91c1c;">
 
 <i class="bi bi-exclamation-triangle-fill"></i>
 
@@ -2467,16 +2304,13 @@ Emergency
 
 </strong>
 
-
 <small>
 
 Immediate requirement.
 
 </small>
 
-
 </label>
-
 
 </div>
 
@@ -2488,7 +2322,7 @@ Immediate requirement.
 
 
 <!-- =================================================
-DATE
+SECTION 5
 ================================================= -->
 
 <div class="section">
@@ -2497,7 +2331,7 @@ DATE
 <div class="section-title">
 
 
-<div class="section-number">
+<div class="number">
 
 5
 
@@ -2511,7 +2345,7 @@ Required Date
 </h4>
 
 <small>
-When is the blood required?
+When is the blood needed?
 </small>
 
 </div>
@@ -2520,28 +2354,12 @@ When is the blood required?
 </div>
 
 
-<div class="row">
-
-
-<div class="col-md-6">
-
-
-<label class="form-label">
-
-Required Date
-<span class="required">*</span>
-
-</label>
-
-
 <input
 type="date"
 name="required_date"
 class="form-control"
 min="<?php
-
 echo date("Y-m-d");
-
 ?>"
 value="<?php
 
@@ -2552,18 +2370,12 @@ echo htmlspecialchars(
 ?>"
 required>
 
-
-</div>
-
-
-</div>
-
 </div>
 
 
 
 <!-- =================================================
-MESSAGE
+SECTION 6
 ================================================= -->
 
 <div class="section">
@@ -2572,7 +2384,7 @@ MESSAGE
 <div class="section-title">
 
 
-<div class="section-number">
+<div class="number">
 
 6
 
@@ -2586,7 +2398,7 @@ Additional Information
 </h4>
 
 <small>
-Anything else the donor should know.
+Optional information for the donor.
 </small>
 
 </div>
@@ -2598,7 +2410,7 @@ Anything else the donor should know.
 <textarea
 name="additional_message"
 class="form-control"
-placeholder="Example: Blood is required for surgery tomorrow morning."><?php
+placeholder="Example: Blood is needed for surgery tomorrow morning."><?php
 
 echo htmlspecialchars(
     $additional_message
@@ -2611,32 +2423,26 @@ echo htmlspecialchars(
 
 
 
-<!-- =================================================
-INFO
-================================================= -->
+<!-- INFO -->
 
-<div class="info-box">
-
+<div class="info">
 
 <i class="bi bi-shield-check"></i>
 
 &nbsp;
 
-<strong>Important:</strong>
+<strong>Privacy:</strong>
 
-Please provide accurate information.
-The selected donor will receive a notification
-about this request. For a medical emergency,
-contact the hospital or emergency medical
-services directly.
+You don't need an account to request blood.
+Your name and contact number will be shared
+with the selected donor so they can contact
+you about the request.
 
 </div>
 
 
 
-<!-- =================================================
-BUTTONS
-================================================= -->
+<!-- ACTIONS -->
 
 <div class="actions">
 
@@ -2649,7 +2455,7 @@ class="back-btn">
 
 &nbsp;
 
-Back to Donors
+Back
 
 </a>
 
@@ -2680,9 +2486,17 @@ Send Blood Request
 
 
 
-<script
-src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js">
-</script>
+<footer>
+
+<strong>
+BloodConnect
+</strong>
+
+&nbsp; | &nbsp;
+
+Connecting blood donors with people in need.
+
+</footer>
 
 
 </body>

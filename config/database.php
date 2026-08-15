@@ -30,10 +30,10 @@ if (!$conn) {
         . mysqli_connect_error()
     );
 }
-if($conn)
-    {
-        echo "Database Connection Successful";
-    }
+// if($conn)
+//     {
+//         echo "Database Connection Successful";
+//     }
 
 
 

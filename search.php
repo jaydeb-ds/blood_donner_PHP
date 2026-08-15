@@ -1375,7 +1375,7 @@ class="navbar-nav ms-auto align-items-lg-center">
 
 <a
 class="nav-link"
-href="../index.php">
+href="index.php">
 
 Home
 
@@ -1388,7 +1388,7 @@ Home
 
 <a
 class="nav-link"
-href="../about.php">
+href="about.php">
 
 About Us
 
@@ -1415,7 +1415,7 @@ Find Donor
 
 <a
 class="nav-link"
-href="../contact.php">
+href="contact.php">
 
 Contact
 
@@ -1428,7 +1428,7 @@ Contact
 
 <a
 class="nav-link login-btn"
-href="../login.php">
+href="login.php">
 
 Login
 
@@ -2282,7 +2282,11 @@ Call Donor
 
 
 <a
-href="/blood/login.php"
+href="request.php?donor_id=<?php
+echo urlencode(
+    $donor["user_id"]
+);
+?>"
 class="request-btn">
 
 <i class="bi bi-droplet-fill"></i>
